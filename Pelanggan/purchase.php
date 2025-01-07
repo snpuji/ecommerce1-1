@@ -1,5 +1,5 @@
 <?php
-include 'config.php'; // Koneksi database
+include 'config.php'; 
 
 if (!isset($_SESSION['email'])) {
     die('Error: Anda harus login untuk mengakses halaman ini.');
