@@ -161,22 +161,22 @@ foreach ($products as $product) {
                             <div class="form-group">
                                 <label for="full_name">Full Name</label>
                                 <input type="text" id="full_name" name="nama" class="form-control" 
-                                       value="<?php echo htmlspecialchars($nama_pelanggan); ?>" required>
+                                       value="<?php echo htmlspecialchars($nama_pelanggan); ?>" readonly>
                             </div>
                             <div class="form-group">
                                 <label for="address">Address</label>
                                 <input type="text" id="address" name="alamat" class="form-control" 
-                                       value="<?php echo htmlspecialchars($alamat_pelanggan); ?>" required>
+                                       value="<?php echo htmlspecialchars($alamat_pelanggan); ?>" readonly>
                             </div>
                             <div class="form-group">
                                 <label for="phone">Phone Number</label>
                                 <input type="text" id="phone" name="no_hp" class="form-control" 
-                                       value="<?php echo htmlspecialchars($telepon_pelanggan); ?>" required>
+                                       value="<?php echo htmlspecialchars($telepon_pelanggan); ?>" readonly>
                             </div>
                             <div class="form-group">
                                 <label for="email">Email</label>
                                 <input type="email" id="email" name="email" class="form-control" 
-                                       value="<?php echo htmlspecialchars($email); ?>" required>
+                                       value="<?php echo htmlspecialchars($email); ?>" readonly>
                             </div>
                             <div class="form-group">
                                 <label for="notes">Notes (Optional)</label>
@@ -460,7 +460,14 @@ document.addEventListener('DOMContentLoaded', function() {
             const formData = new FormData();
             formData.append('destination', citySelect.value);
             formData.append('courier', this.value);
-            formData.append('weight', '1000'); // Sesuaikan dengan berat produk
+
+            // Hitung total quantity dari semua produk
+            let totalQuantity = 0;
+            <?php foreach ($products as $product) { ?>
+                totalQuantity += <?php echo $product['quantity']; ?>;
+            <?php } ?>
+            
+            formData.append('quantity', totalQuantity);
 
             fetch('/ecommerce1/rajaongkir/cost.php', {
                 method: 'POST',
@@ -764,6 +771,12 @@ document.addEventListener('DOMContentLoaded', function() {
     .shipping-cost {
         border-bottom: 1px solid #eee;
         padding-bottom: 10px;
+    }
+
+    .form-control[readonly] {
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+        cursor: default;
     }
 </style>
 
