@@ -341,7 +341,7 @@ async function processPayment() {
             window.snap.pay(token, {
                 onSuccess: function(result) {
                     alert('Payment success!');
-                    window.location.href = 'order-success.php';
+                    window.location.href = 'utama.php?page=orderlist';
                 },
                 onPending: function(result) {
                     alert('Payment pending. Please complete your payment.');
@@ -375,6 +375,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const serviceSelect = document.querySelector('select[name="shipping_service"]');
     const shippingCostDisplay = document.getElementById('shipping-cost');
     const finalTotalDisplay = document.getElementById('final-total');
+
+
+    
     const shippingRow = document.getElementById('shipping-row');
     
     // Load Provinces
@@ -782,3 +785,245 @@ document.addEventListener('DOMContentLoaded', function() {
 
 </body>
 </html>
+
+<style>  
+    #notes {  
+        border: 2px solid #ccc;  
+        padding: 10px;  
+        width: 100%;  
+        height: 100px;  
+        border-radius: 8px;  
+        font-size: 14px;  
+        resize: none;  
+    }  
+    #notes:focus {  
+        border-color: #007BFF;  
+        box-shadow: 0 0 5px rgba(0, 123, 255, 0.5);  
+    }  
+  
+    .cart__total {  
+        background: #f9f9f9;  
+        padding: 20px;  
+        border-radius: 8px;  
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);  
+    }  
+    .order-title, .order-summary-title {  
+        font-size: 1.5rem;  
+        font-weight: bold;  
+        margin-bottom: 15px;  
+    }  
+    .order-table {  
+        width: 100%;  
+        border-collapse: collapse;  
+        margin-bottom: 20px;  
+    }  
+    .order-table th, .order-table td {  
+        text-align: center;  
+        padding: 10px;  
+        font-size: 0.9rem;  
+    }  
+    .order-table thead th {  
+        border-bottom: 2px solid #ddd;  
+        font-size: 1rem;  
+        font-weight: bold;  
+    }  
+    .product__item {  
+        display: flex;  
+        align-items: center;  
+    }  
+    .product-image {  
+        width: 60px;  
+        height: 60px;  
+        margin-right: 10px;  
+        border-radius: 5px;  
+        object-fit: cover;  
+    }  
+    .product-details h6 {  
+        font-size: 1rem;  
+        margin: 0;  
+        font-weight: 600;  
+    }  
+    .product-details h5 {  
+        font-size: 0.9rem;  
+        margin: 0;  
+        color: #888;  
+    }  
+    .quantity__item {  
+        font-size: 0.9rem;  
+    }  
+    .cart__price {  
+        font-size: 0.9rem;  
+        font-weight: bold;  
+    }  
+    .no-products {  
+        text-align: center;  
+        font-size: 0.9rem;  
+        color: #888;  
+    }  
+    .order-summary {  
+        list-style: none;  
+        padding: 0;  
+        margin: 0;  
+        font-size: 1rem;  
+    }  
+    .order-summary li {  
+        display: flex;  
+        justify-content: space-between;  
+        margin-bottom: 10px;  
+        font-weight: bold;  
+    }  
+    .primary-btn {  
+        background-color: #28a745;  
+        color: #fff;  
+        border: none;  
+        padding: 10px 20px;  
+        border-radius: 5px;  
+        font-size: 1rem;  
+        cursor: pointer;  
+    }  
+    .primary-btn:hover {  
+        background-color: #218838;  
+    }  
+  
+    .shipping-details {  
+        margin-top: 20px;  
+        padding: 20px;  
+        background: #f8f9fa;  
+        border-radius: 5px;  
+    }  
+  
+    .shipping-details h4 {  
+        margin-bottom: 20px;  
+    }  
+  
+    .form-group {  
+        margin-bottom: 15px;  
+    }  
+  
+    .checkout__order__shipping {  
+        display: flex;  
+        justify-content: space-between;  
+        padding: 10px 0;  
+        border-bottom: 1px solid #e1e1e1;  
+    }  
+  
+    .shipping-details select {  
+        display: block !important;  
+        width: 100%;  
+        padding: 8px;  
+        margin-bottom: 10px;  
+        border: 1px solid #ddd;  
+        border-radius: 4px;  
+    }  
+  
+    .form-group {  
+        margin-bottom: 15px;  
+    }  
+  
+    .shipping-details label {  
+        display: block;  
+        margin-bottom: 5px;  
+        font-weight: bold;  
+    }  
+  
+    /* Tambahkan CSS ini untuk menghilangkan nice-select */  
+    .nice-select {  
+        display: none !important;  
+    }  
+  
+    /* Style untuk dropdown asli */  
+    .shipping-details {  
+        margin: 20px 0;  
+    }  
+  
+    .form-group {  
+        margin-bottom: 15px;  
+    }  
+  
+    .form-group label {  
+        display: block;  
+        margin-bottom: 5px;  
+        font-weight: normal;  
+    }  
+  
+    .custom-select {  
+        position: relative;  
+        width: 100%;  
+    }  
+  
+    .custom-select select {  
+        width: 100%;  
+        padding: 8px 15px;  
+        border: 1px solid #ddd;  
+        border-radius: 4px;  
+        background-color: white;  
+        cursor: pointer;  
+        appearance: none;  
+        -webkit-appearance: none;  
+        -moz-appearance: none;  
+    }  
+  
+    /* Pastikan select asli tetap terlihat */  
+    select.form-control {  
+        display: block !important;  
+        opacity: 1 !important;  
+        visibility: visible !important;  
+    }  
+  
+    /* Menghilangkan semua elemen nice-select yang mungkin dibuat oleh plugin */  
+    .nice-select,  
+    .nice-select *,  
+    .nice-select.form-control {  
+        display: none !important;  
+        opacity: 0 !important;  
+        visibility: hidden !important;  
+    }  
+  
+    .order-summary {  
+        margin-top: 20px;  
+    }  
+  
+    .summary-item {  
+        display: flex;  
+        justify-content: space-between;  
+        margin-bottom: 10px;  
+        padding: 5px 0;  
+    }  
+  
+    .summary-item.total {  
+        border-top: 1px solid #ddd;  
+        margin-top: 10px;  
+        padding-top: 10px;  
+        font-weight: bold;  
+    }  
+  
+    .price {  
+        color: #e53637;  
+    }  
+  
+    .subtotal, .shipping-cost, .total {  
+        display: flex;  
+        justify-content: space-between;  
+        margin-bottom: 10px;  
+        padding: 5px 0;  
+    }  
+  
+    .total {  
+        border-top: 1px solid #ddd;  
+        padding-top: 10px;  
+        margin-top: 5px;  
+        font-weight: bold;  
+    }  
+  
+    .price {  
+        color: #e53637;  
+    }  
+  
+    .shipping-cost {  
+        border-bottom: 1px solid #eee;  
+        padding-bottom: 10px;  
+    }  
+</style>  
+  
+</body>  
+</html>  

@@ -65,6 +65,20 @@ if (isset($_SESSION['success_message'])) {
     unset($_SESSION['success_message']);
 }
 
+// Ambil id_penjual berdasarkan id_produk  
+$query_penjual = "SELECT id_penjual FROM produk WHERE id_produk = ?";  
+$stmt_penjual = $koneksi->prepare($query_penjual);  
+$stmt_penjual->bind_param("i", $id_produk);  
+$stmt_penjual->execute();  
+$result_penjual = $stmt_penjual->get_result();  
+  
+if ($result_penjual->num_rows > 0) {  
+    $row_penjual = $result_penjual->fetch_assoc();  
+    $id_penjual = $row_penjual['id_penjual'];  
+} else {  
+    die("Produk tidak ditemukan.");  
+}  
+
 // Ambil 5 ulasan terbaru
 $query_terbaru = "SELECT * FROM ulasan WHERE id_produk = ? ORDER BY tanggal_ulasan DESC LIMIT 5";
 $stmt_terbaru = $koneksi->prepare($query_terbaru);
@@ -87,11 +101,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             die("Harap isi rating dan komentar dengan benar.");
         }
 
-        $query_ulasan = "INSERT INTO ulasan (id_pelanggan, id_produk, rating, komentar, tanggal_ulasan)
-                         VALUES (?, ?, ?, ?, NOW())";
-        $stmt_ulasan = $koneksi->prepare($query_ulasan);
-        $stmt_ulasan->bind_param("iiis", $id_pelanggan, $id_produk, $rating, $komentar);
-        $stmt_ulasan->execute();
+        $query_ulasan = "INSERT INTO ulasan (id_pelanggan, id_produk, id_penjual, rating, komentar, tanggal_ulasan)  
+                 VALUES (?, ?, ?, ?, ?, NOW())";  
+        $stmt_ulasan = $koneksi->prepare($query_ulasan);  
+        $stmt_ulasan->bind_param("iiiss", $id_pelanggan, $id_produk, $id_penjual, $rating, $komentar);  
+        $stmt_ulasan->execute();  
 
         // Set pesan sukses ke session
         session_start();
@@ -104,9 +118,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 
-// Proses jika formulir dikirim
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Ambil kuantitas untuk setiap ukuran
+    // Ambil kuantitas untuk setiap ukuran produk
     if ($row_produk['id_kategori'] == 17 || $row_produk['id_kategori'] == 18) {
         $s = isset($_POST['s']) ? (int)$_POST['s'] : 0;
         $m = isset($_POST['m']) ? (int)$_POST['m'] : 0;
@@ -117,10 +130,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Hitung total kuantitas
         $quantity = $s + $m + $l + $extralarge + $doubleextralarge;
 
-        if ($s + $m + $l + $extralarge + $doubleextralarge <= 0) {
+        if ($quantity <= 0) {
             die("Harap masukkan kuantitas untuk setidaknya satu ukuran.");
         }
-     
     } else {
         // Untuk kategori lain, ambil kuantitas dari input
         $quantity = isset($_POST['quantity']) ? (int)$_POST['quantity'] : 0;
@@ -137,37 +149,61 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $doubleextralarge = 0;
     }
 
-    // Cek apakah produk sudah ada di keranjang
-    $query_check = "SELECT * FROM keranjang WHERE id_pelanggan = ? AND id_produk = ?";
-    $stmt_check = $koneksi->prepare($query_check);
-    $stmt_check->bind_param("ii", $id_pelanggan, $id_produk);
-    $stmt_check->execute();
-    $result_check = $stmt_check->get_result();
+    // Ambil data produk dari row_produk
+    $nama_produk = $row_produk['nama_produk'];
+    $gambar = $row_produk['gambar'];
+    $harga = $row_produk['harga'];
 
-    if ($result_check->num_rows > 0) {
-        // Jika produk sudah ada, tambahkan quantity
-        $query_update = "UPDATE keranjang 
-                         SET small = small + ?, medium = medium + ?, large = large + ?, extralarge = extralarge + ?, doubleextralarge = doubleextralarge + ?, updated_at = NOW()
-                         WHERE id_pelanggan = ? AND id_produk = ?";
-        $stmt_update = $koneksi->prepare($query_update);
-        $stmt_update->bind_param("iiiiiii", $s, $m, $l, $extralarge, $doubleextralarge, $id_pelanggan, $id_produk);
-        $stmt_update->execute();
+    // Jika tombol 'checkout' yang diklik, simpan data checkout dalam sesi
+    if (isset($_POST['checkout'])) {
+        // Simpan data checkout dalam sesi
+        $_SESSION['checkout_data'] = [
+            'id_pelanggan' => $id_pelanggan,
+            'id_produk' => $id_produk,
+            'harga' => $harga,
+            'nama_produk' => $nama_produk,
+            'gambar' => $gambar,
+            'sizes' => [
+                'small' => $s,
+                'medium' => $m,
+                'large' => $l,
+                'extralarge' => $extralarge,
+                'doubleextralarge' => $doubleextralarge
+            ],
+            'quantity' => $quantity,
+        ];
+        // Redirect ke halaman checkout tanpa menyimpan data ke keranjang
+        header("Location: utama.php?page=purchase&id_produk=$id_produk");
+        exit();
     } else {
-        // Jika produk belum ada, tambahkan ke keranjang
-        $query_insert = "INSERT INTO keranjang (id_pelanggan, id_produk, nama_produk, gambar, harga, quantity, small, medium, large, extralarge, doubleextralarge, created_at, updated_at)
-                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
-        $stmt_insert = $koneksi->prepare($query_insert);
-        $nama_produk = $row_produk['nama_produk'];
-        $gambar = $row_produk['gambar'];
-        $harga = $row_produk['harga'];
+        // Cek apakah produk sudah ada di keranjang hanya jika tombol 'Add to Cart' yang diklik
+        $query_check = "SELECT * FROM keranjang WHERE id_pelanggan = ? AND id_produk = ?";
+        $stmt_check = $koneksi->prepare($query_check);
+        $stmt_check->bind_param("ii", $id_pelanggan, $id_produk);
+        $stmt_check->execute();
+        $result_check = $stmt_check->get_result();
 
-        $stmt_insert->bind_param("iissiissiii", $id_pelanggan, $id_produk, $nama_produk, $gambar, $harga, $quantity, $s, $m, $l, $extralarge, $doubleextralarge);
-        $stmt_insert->execute();
+        if ($result_check->num_rows > 0) {
+            // Jika produk sudah ada, tambahkan quantity
+            $query_update = "UPDATE keranjang 
+                             SET small = small + ?, medium = medium + ?, large = large + ?, extralarge = extralarge + ?, doubleextralarge = doubleextralarge + ?, updated_at = NOW()
+                             WHERE id_pelanggan = ? AND id_produk = ?";
+            $stmt_update = $koneksi->prepare($query_update);
+            $stmt_update->bind_param("iiiiiii", $s, $m, $l, $extralarge, $doubleextralarge, $id_pelanggan, $id_produk);
+            $stmt_update->execute();
+        } else {
+            // Jika produk belum ada, tambahkan ke keranjang
+            $query_insert = "INSERT INTO keranjang (id_pelanggan, id_produk, nama_produk, gambar, harga, quantity, small, medium, large, extralarge, doubleextralarge, created_at, updated_at)
+                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
+            $stmt_insert = $koneksi->prepare($query_insert);
+            $stmt_insert->bind_param("iissiissiii", $id_pelanggan, $id_produk, $nama_produk, $gambar, $harga, $quantity, $s, $m, $l, $extralarge, $doubleextralarge);
+            $stmt_insert->execute();
+        }
+
+        // Redirect ke halaman keranjang
+        header('Location: utama.php?page=cart');
+        exit();
     }
-
-    // Redirect setelah berhasil menambahkan ke keranjang
-    header('Location: utama.php?page=cart');
-    exit();
 }
 ?>
 
@@ -181,52 +217,79 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     .fa-star.checked {
         color: gold; /* Warna bintang aktif (emas) */
     }
-    .product__details__option__size {
+   /* Styling untuk opsi ukuran produk */
+.product__details__option {
+    margin-bottom: 20px;
+    padding: 10px;
+    background-color: #f9f9f9;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.product__details__option h5 {
+    font-size: 1.2em;
+    font-weight: bold;
+    margin-bottom: 10px;
+    color: #333;
+}
+
+/* Styling untuk pilihan ukuran */
+.product__details__option__size {
     display: flex;
     flex-wrap: wrap;
-    gap: 10px;
-    margin-top: 10px;
+    gap: 15px;
 }
 
 .product__details__option__size div {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    width: 60px;
-    height: 60px;
-    background-color: #f7f7f7;
-    border: 1px solid #ddd;
-    border-radius: 5px;
+    background-color: #fff;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    width: 100px;
     text-align: center;
-    font-weight: bold;
-    font-size: 16px;
-    cursor: pointer;
-    position: relative;
-    margin-bottom: 10px; /* Jarak bawah */
-    transition: all 0.3s ease;
+    transition: background-color 0.3s;
 }
 
 .product__details__option__size div:hover {
-    background-color: #eaeaea;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    background-color: #f0f0f0;
+}
+
+.product__details__option__size strong {
+    font-size: 1.2em;
+    color: #333;
+    margin-bottom: 10px;
+    display: block;
 }
 
 .product__details__option__size input[type="number"] {
-    margin-top: 5px;
     width: 50px;
-    height: 30px;
-    font-size: 14px;
+    padding: 5px;
     text-align: center;
     border: 1px solid #ccc;
-    border-radius: 3px;
-    background-color: #fff;
+    border-radius: 5px;
+    font-size: 1em;
 }
 
 .product__details__option__size span {
-    font-size: 12px;
-    color: #888;
+    font-size: 0.9em;
+    color: #777;
     margin-top: 5px;
+}
+
+/* Styling untuk input kuantitas (untuk produk non-ukuran) */
+.product__details__option input[type="number"] {
+    width: 80px;
+    padding: 8px;
+    text-align: center;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: 1em;
+    margin-right: 10px;
+}
+
+.product__details__option span {
+    font-size: 0.9em;
+    color: #777;
 }
 
 </style>
@@ -286,76 +349,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $row = $result->fetch_assoc();
                             $nama_produk = $row['nama_produk'];
                             $gambar = $row['gambar']; // Pastikan gambar diambil dari database
-                        ?>
+                        }?>
                             <h4><?php echo htmlspecialchars($row['nama_produk']); ?></h4>
                             <h3>Rp<?php echo number_format($row['harga'], 0, ',', '.'); ?></h3>
 
                             <form action="" method="POST">
-                                <!-- Hidden Input Fields -->
-                                <input type="hidden" name="id_produk" value="<?php echo $id_produk; ?>">
-                                <input type="hidden" name="harga" value="<?php echo $row['harga']; ?>">
-                                <input type="hidden" name="nama_produk" value="<?php echo htmlspecialchars($nama_produk); ?>">
-                                <input type="hidden" name="gambar" value="<?php echo htmlspecialchars($gambar); ?>">
-                                <input type="hidden" name="size" id="selected-size" value=""> <!-- Hidden input untuk ukuran -->
-
-                                <?php if ($row['id_kategori'] == 17 || $row['id_kategori'] == 18): ?>
-                                    <div class="product__details__option">
-                                        <h5>Enter Quantity for Each Size</h5>
-                                </br>
-                                        <div class="product__details__option__size">
-                                            <?php if (isset($stok_row['small']) && $stok_row['small'] > 0): ?>
-                                                <div>
-                                                    <strong>S</strong>
-                                                    <input type="number" name="s" id="s" min="0" max="<?php echo $stok_row['small']; ?>" value="0">
-                                                    <span>Stok: <?php echo $stok_row['small']; ?></span>
-                                                </div>
-                                            <?php endif; ?>
-                                            <?php if (isset($stok_row['medium']) && $stok_row['medium'] > 0): ?>
-                                                <div>
-                                                    <strong>M</strong>
-                                                    <input type="number" name="m" id="m" min="0" max="<?php echo $stok_row['medium']; ?>" value="0">
-                                                    <span>Stok: <?php echo $stok_row['medium']; ?></span>
-                                                </div>
-                                            <?php endif; ?>
-                                            <?php if (isset($stok_row['large']) && $stok_row['large'] > 0): ?>
-                                                <div>
-                                                    <strong>L</strong>
-                                                    <input type="number" name="l" id="l" min="0" max="<?php echo $stok_row['large']; ?>" value="0">
-                                                    <span>Stok: <?php echo $stok_row['large']; ?></span>
-                                                </div>
-                                            <?php endif; ?>
-                                            <?php if (isset($stok_row['extralarge']) && $stok_row['extralarge'] > 0): ?>
-                                                <div>
-                                                    <strong>XL</strong>
-                                                    <input type="number" name="extralarge" id="extralarge" min="0" max="<?php echo $stok_row['extralarge']; ?>" value="0">
-                                                    <span>Stok: <?php echo $stok_row['extralarge']; ?></span>
-                                                </div>
-                                            <?php endif; ?>
-                                            <?php if (isset($stok_row['doubleextralarge']) && $stok_row['doubleextralarge'] > 0): ?>
-                                                <div>
-                                                    <strong>XXL</strong>
-                                                    <input type="number" name="doubleextralarge" id="doubleextralarge" min="0" max="<?php echo $stok_row['doubleextralarge']; ?>" value="0">
-                                                    <span>Stok: <?php echo $stok_row['doubleextralarge']; ?></span>
-                                                </div>
-                                            <?php endif; ?>
-                                        </div>
-                                    </div>
-                                <?php else: ?>
-                                    <!-- Untuk kategori lain, tampilkan input kuantitas saja -->
-                                    <div class="product__details__option">
-                                        <h5>Enter Quantity</h5>
-                                        <input type="number" name="quantity" min="1" max="<?php echo $stok_row['total_stok']; ?>" value="1">
-                                        <span>Total Stok: <?php echo $stok_row['total_stok']; ?></span>
-                                    </div>
-                                <?php endif; ?>
-
-                                <!-- Submit Button -->
-                                <button type="submit" class="primary-btn checkout-btn" name="add_to_cart">Add To Cart</button>
-                            </form>
-                            <br>
-                        <?php } ?>
-
-                        <form id="product-form" action="utama.php?page=purchase" method="POST">
     <!-- Hidden Input Fields -->
     <input type="hidden" name="id_produk" value="<?php echo $id_produk; ?>">
     <input type="hidden" name="harga" value="<?php echo $row['harga']; ?>">
@@ -366,31 +364,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="product__details__option">
             <h5>Enter Quantity for Each Size</h5>
             <div class="product__details__option__size">
-                <div>
-                    <strong>S</strong>
-                    <input type="number" name="s" min="0" max="<?php echo $stok_row['small']; ?>" value="0">
-                    <span>Stok: <?php echo $stok_row['small']; ?></span>
-                </div>
-                <div>
-                    <strong>M</strong>
-                    <input type="number" name="m" min="0" max="<?php echo $stok_row['medium']; ?>" value="0">
-                    <span>Stok: <?php echo $stok_row['medium']; ?></span>
-                </div>
-                <div>
-                    <strong>L</strong>
-                    <input type="number" name="l" min="0" max="<?php echo $stok_row['large']; ?>" value="0">
-                    <span>Stok: <?php echo $stok_row['large']; ?></span>
-                </div>
-                <div>
-                    <strong>XL</strong>
-                    <input type="number" name="extralarge" min="0" max="<?php echo $stok_row['extralarge']; ?>" value="0">
-                    <span>Stok: <?php echo $stok_row['extralarge']; ?></span>
-                </div>
-                <div>
-                    <strong>XXL</strong>
-                    <input type="number" name="doubleextralarge" min="0" max="<?php echo $stok_row['doubleextralarge']; ?>" value="0">
-                    <span>Stok: <?php echo $stok_row['doubleextralarge']; ?></span>
-                </div>
+                <?php if ($stok_row['small'] > 0): ?>
+                    <div>
+                        <strong>S</strong>
+                        <input type="number" name="s" min="0" max="<?php echo $stok_row['small']; ?>" value="0">
+                        <span>Stok: <?php echo $stok_row['small']; ?></span>
+                    </div>
+                <?php endif; ?>
+                
+                <?php if ($stok_row['medium'] > 0): ?>
+                    <div>
+                        <strong>M</strong>
+                        <input type="number" name="m" min="0" max="<?php echo $stok_row['medium']; ?>" value="0">
+                        <span>Stok: <?php echo $stok_row['medium']; ?></span>
+                    </div>
+                <?php endif; ?>
+                
+                <?php if ($stok_row['large'] > 0): ?>
+                    <div>
+                        <strong>L</strong>
+                        <input type="number" name="l" min="0" max="<?php echo $stok_row['large']; ?>" value="0">
+                        <span>Stok: <?php echo $stok_row['large']; ?></span>
+                    </div>
+                <?php endif; ?>
+                
+                <?php if ($stok_row['extralarge'] > 0): ?>
+                    <div>
+                        <strong>XL</strong>
+                        <input type="number" name="extralarge" min="0" max="<?php echo $stok_row['extralarge']; ?>" value="0">
+                        <span>Stok: <?php echo $stok_row['extralarge']; ?></span>
+                    </div>
+                <?php endif; ?>
+                
+                <?php if ($stok_row['doubleextralarge'] > 0): ?>
+                    <div>
+                        <strong>XXL</strong>
+                        <input type="number" name="doubleextralarge" min="0" max="<?php echo $stok_row['doubleextralarge']; ?>" value="0">
+                        <span>Stok: <?php echo $stok_row['doubleextralarge']; ?></span>
+                    </div>
+                <?php endif; ?>
             </div>
         </div>
     <?php else: ?>
@@ -401,47 +413,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
     <?php endif; ?>
 
-    <!-- Button untuk Checkout -->
-    <button type="submit" class="primary-btn checkout-btn">Checkout</button>
+    <!-- Button untuk menambah ke keranjang atau checkout -->
+    <button type="submit" class="primary-btn checkout-btn" name="add_to_cart">Add To Cart</button>
+    <button type="submit" class="primary-btn checkout-btn" name="checkout">Checkout</button>
 </form>
-
-
-<script>
-function checkout() {
-    // Set action untuk checkout
-    document.getElementById('product-form').action = 'utama.php?page=purchase';
-    // Set action value untuk checkout
-    const form = document.getElementById('product-form');
-    const checkoutButton = document.createElement('input');
-    checkoutButton.type = 'hidden';
-    checkoutButton.name = 'action';
-    checkoutButton.value = 'checkout';
-    form.appendChild(checkoutButton);
-    // Submit form
-    form.submit();
-}
-</script>
-
-
-
-                        <script>
-                            // Update hidden fields when size or quantity changes
-                            const sizeInputs = document.querySelectorAll('input[name="size"]');
-                            const sizeHiddenInput = document.getElementById('selected-size');
-                            const quantityInput = document.getElementById('max-stok-input');
-                            const quantityHiddenInput = document.getElementById('selected-quantity');
-
-                            sizeInputs.forEach(radio => {
-                                radio.addEventListener('change', function () {
-                                    sizeHiddenInput.value = this.value;
-                                });
-                            });
-
-                            quantityInput.addEventListener('input', function () {
-                                quantityHiddenInput.value = this.value;
-                            });
-                        </script>
-
                     </div>
                 </div>
             </div>
